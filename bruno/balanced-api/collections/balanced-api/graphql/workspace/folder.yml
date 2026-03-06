@@ -1,7 +1,7 @@
 info:
-  name: merchants
+  name: workspace
   type: folder
-  seq: 4
+  seq: 9
 
 request:
   auth: inherit

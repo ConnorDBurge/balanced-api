@@ -1,7 +1,7 @@
 info:
-  name: categories
+  name: transaction
   type: folder
-  seq: 3
+  seq: 8
 
 request:
   auth: inherit
