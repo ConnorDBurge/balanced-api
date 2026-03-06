@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.dripl</groupId>
-    <artifactId>dripl-api</artifactId>
+    <groupId>com.balanced</groupId>
+    <artifactId>balanced-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>dripl-api</name>
-    <description>Dripl Finance API</description>
+    <name>balanced-api</name>
+    <description>Balanced Finance API</description>
 
     <properties>
         <java.version>21</java.version>

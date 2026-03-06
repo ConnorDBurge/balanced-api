@@ -1,0 +1,126 @@
+package com.balanced.account.service;
+
+import com.balanced.account.dto.CreateAccountInput;
+import com.balanced.account.dto.UpdateAccountInput;
+import com.balanced.account.entity.Account;
+import com.balanced.account.enums.AccountSubType;
+import com.balanced.account.enums.AccountType;
+import com.balanced.account.mapper.AccountMapper;
+import com.balanced.account.repository.AccountRepository;
+import com.balanced.common.exception.BadRequestException;
+import com.balanced.common.exception.ConflictException;
+import com.balanced.common.exception.ResourceNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AccountService {
+
+    private final AccountRepository accountRepository;
+    private final AccountMapper accountMapper;
+
+    @Transactional(readOnly = true)
+    public List<Account> listAllByWorkspaceId(UUID workspaceId) {
+        return accountRepository.findAllByWorkspaceId(workspaceId);
+    }
+
+    @Transactional(readOnly = true)
+    public Account getAccount(UUID accountId, UUID workspaceId) {
+        return accountRepository.findByIdAndWorkspaceId(accountId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+    }
+
+    @Transactional
+    public Account createAccount(UUID workspaceId, CreateAccountInput dto) {
+        if (accountRepository.existsByWorkspaceIdAndNameIgnoreCase(workspaceId, dto.getName())) {
+            throw new ConflictException("An account named '" + dto.getName() + "' already exists");
+        }
+
+        if (dto.getType() != null && dto.getSubType() != null && !dto.getType().supportsSubType(dto.getSubType())) {
+            throw typeSubTypeMismatch(dto.getType(), dto.getSubType());
+        }
+
+        BigDecimal startBal = dto.getStartingBalance() != null ? dto.getStartingBalance() : BigDecimal.ZERO;
+
+        Account account = accountRepository.save(Account.builder()
+                .workspaceId(workspaceId)
+                .name(dto.getName())
+                .type(dto.getType())
+                .subType(dto.getSubType())
+                .startingBalance(startBal)
+                .balance(startBal)
+                .currency(dto.getCurrency() != null ? dto.getCurrency() : com.balanced.account.enums.CurrencyCode.USD)
+                .institutionName(dto.getInstitutionName())
+                .source(dto.getSource() != null ? dto.getSource() : com.balanced.account.enums.AccountSource.MANUAL)
+                .build());
+
+        log.info("Created account '{}' ({})", account.getName(), account.getId());
+        return account;
+    }
+
+    @Transactional
+    public Account updateAccount(UUID accountId, UUID workspaceId, UpdateAccountInput dto) {
+        Account account = getAccount(accountId, workspaceId);
+
+        if (dto.getName() != null
+                && !dto.getName().equalsIgnoreCase(account.getName())
+                && accountRepository.existsByWorkspaceIdAndNameIgnoreCase(workspaceId, dto.getName())) {
+            throw new ConflictException("An account named '" + dto.getName() + "' already exists");
+        }
+
+        boolean startingBalanceChanged = dto.getStartingBalance() != null;
+
+        accountMapper.updateEntity(dto, account);
+
+        if (account.getType() != null && account.getSubType() != null
+                && !account.getType().supportsSubType(account.getSubType())) {
+            throw typeSubTypeMismatch(account.getType(), account.getSubType());
+        }
+
+        account = accountRepository.save(account);
+
+        if (startingBalanceChanged) {
+            recomputeBalance(accountId);
+            account = accountRepository.findById(accountId).orElseThrow();
+        }
+
+        log.info("Updating account '{}' ({})", account.getName(), accountId);
+        return account;
+    }
+
+    @Transactional
+    public void deleteAccount(UUID accountId, UUID workspaceId) {
+        Account account = getAccount(accountId, workspaceId);
+        log.info("Deleting account '{}' ({})", account.getName(), accountId);
+        accountRepository.delete(account);
+    }
+
+    @Transactional
+    public void recomputeBalance(UUID accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+        BigDecimal txnSum = accountRepository.sumTransactionAmounts(accountId);
+        account.setBalance(account.getStartingBalance().add(txnSum));
+        account.setBalanceLastUpdated(LocalDateTime.now());
+        accountRepository.save(account);
+    }
+
+    private BadRequestException typeSubTypeMismatch(AccountType type, AccountSubType subType) {
+        String allowed = type.allowedSubTypes().stream()
+                .map(Enum::name)
+                .collect(Collectors.joining(", "));
+        return new BadRequestException(String.format(
+                "Sub-type '%s' is not valid for account type '%s'. Allowed sub-types: [%s]",
+                subType, type, allowed));
+    }
+}

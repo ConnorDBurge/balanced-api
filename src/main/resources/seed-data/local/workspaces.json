@@ -4,7 +4,7 @@
     "name": "Burge Family",
     "members": [
       {
-        "email": "kyndall@dripl.dev",
+        "email": "kyndall@balanced.dev",
         "roles": [
           "READ",
           "WRITE",
@@ -29,7 +29,7 @@
     "budgetPeriodEntries": "$ref:budget-period-entries.json"
   },
   {
-    "ownerEmail": "kyndall@dripl.dev",
+    "ownerEmail": "kyndall@balanced.dev",
     "name": "Kyndall's Budget",
     "accounts": [
       {
@@ -435,7 +435,7 @@
     "budgetPeriodEntries": "$ref:kyndall-budget-period-entries.json"
   },
   {
-    "ownerEmail": "mike@dripl.dev",
+    "ownerEmail": "mike@balanced.dev",
     "name": "Mike's Finances",
     "accounts": [
       {

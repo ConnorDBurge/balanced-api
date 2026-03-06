@@ -1,0 +1,29 @@
+package com.balanced.category.mapper;
+
+import com.balanced.category.dto.CategoryResponse;
+import com.balanced.category.dto.UpdateCategoryInput;
+import com.balanced.category.entity.Category;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+
+import java.util.List;
+
+@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+public interface CategoryMapper {
+
+    CategoryResponse toDto(Category category);
+
+    List<CategoryResponse> toDtos(List<Category> categories);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(target = "workspaceId", ignore = true)
+    @Mapping(target = "parentId", ignore = true)
+    @Mapping(target = "displayOrder", ignore = true)
+    void updateEntity(UpdateCategoryInput dto, @MappingTarget Category category);
+}

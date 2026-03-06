@@ -25,13 +25,13 @@ This file provides guidance to Copilot when working with code in this repository
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Default DB credentials (dev): host `localhost:5432`, db/user/pass `dripl`.
+Default DB credentials (dev): host `localhost:5432`, db/user/pass `balanced`.
 
 ## Architecture
 
 This is a Spring Boot 3 / Java 21 monolith. Full architectural detail is in `.github/ARCHITECTURE.md` — read it before making significant changes. Checkpoint history is in `.github/CHECKPOINTS.md`.
 
-**Package structure:** `com.dripl.<domain>` — `auth`, `user`, `workspace`, `account`, `merchant`, `tag`, `category`, `transaction`, `recurring`, `budget`, `common`. Each domain has `controller`, `dto`, `entity`, `mapper`, `repository`, `service` subpackages.
+**Package structure:** `com.balanced.<domain>` — `auth`, `user`, `workspace`, `account`, `merchant`, `tag`, `category`, `transaction`, `recurring`, `budget`, `common`. Each domain has `controller`, `dto`, `entity`, `mapper`, `repository`, `service` subpackages.
 
 ## Spring Profiles
 

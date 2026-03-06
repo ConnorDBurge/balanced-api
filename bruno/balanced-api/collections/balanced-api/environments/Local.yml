@@ -6,4 +6,4 @@ variables:
   - secret: true
     name: x-api-key
   - secret: true
-    name: user
+    name: defaultUser

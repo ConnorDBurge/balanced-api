@@ -1,13 +1,13 @@
-# Dripl — Checkpoints
+# Balanced — Checkpoints
 
 ## Checkpoint 1: Hello World with Auth ✅
 Spring Boot boots, connects to Postgres, and JWT auth works end-to-end in Postman.
 
 - [x] Initialize Spring Boot project (Java 21, Maven)
-- [x] Create `docker-compose.yml` (dripl-api, dripl-db, dripl-network)
-- [x] Create Dockerfile for dripl-api
+- [x] Create `docker-compose.yml` (balanced-api, balanced-db, balanced-network)
+- [x] Create Dockerfile for balanced-api
 - [x] Add `application.yml` with Postgres, JPA, and JWT config
-- [x] Set up base package structure (`com.dripl.*`)
+- [x] Set up base package structure (`com.balanced.*`)
 - [x] Implement JWT utility (mint/validate with `workspace_id`, `user_id`, `roles` claims)
 - [x] Implement `SecurityConfig` with JWT filter
 - [x] Create `/dev/token` endpoint (profile-gated, disabled in prod)
@@ -55,7 +55,7 @@ Comprehensive test suite and observability features.
 - [x] Maven Failsafe plugin for IT test execution (`*IT.java`)
 - [x] Correlation ID filter (CorrelationIdFilter → MDC → log pattern → response header)
 - [x] Async orphaned workspace cleanup (MembershipDeletedEvent → WorkspaceCleanupListener)
-- [x] `@EnableAsync` on DriplApplication
+- [x] `@EnableAsync` on BalancedApplication
 - [x] Improved log messages with human-readable names + UUIDs
 - [x] Awaitility for async assertion polling in IT tests
 
@@ -91,7 +91,7 @@ Dev-only seed data system that wipes and recreates data on every startup.
 - [x] JSON seed files: `users.json` (flat user list), `workspaces.json` (workspaces with nested members, accounts, merchants)
 - [x] Wipe database on startup using `ON DELETE CASCADE` (delete workspaces → delete users)
 - [x] Seed via service layer (bootstrapUser, provisionWorkspace, createMembership, createAccount, createMerchant)
-- [x] Fake SecurityContext (`seed-data@dripl.dev`) for JPA audit fields (`createdBy`/`updatedBy`)
+- [x] Fake SecurityContext (`seed-data@balanced.dev`) for JPA audit fields (`createdBy`/`updatedBy`)
 - [x] Rename default bootstrap workspace to match seed data names
 - [x] 3 users, 3 workspaces, 10 accounts, 19 merchants, 1 cross-workspace member
 - [x] Verified: Docker startup, API access via bootstrap, workspace isolation
@@ -101,7 +101,7 @@ Full CRUD for transaction tags, scoped to the active workspace.
 
 - [x] Flyway migration V7 for `tags` table
 - [x] Tag entity + repository + service + controller (`/api/v1/tags`)
-- [x] TagStatus consolidated into shared `com.dripl.common.enums.Status` (ACTIVE, ARCHIVED, CLOSED)
+- [x] TagStatus consolidated into shared `com.balanced.common.enums.Status` (ACTIVE, ARCHIVED, CLOSED)
 - [x] Shared Status enum also replaces MerchantStatus and AccountStatus
 - [x] Workspace-scoped queries (all queries filter by `workspaceId`)
 - [x] Duplicate name prevention (case-insensitive, per workspace)
@@ -525,7 +525,7 @@ Ideas captured for future consideration:
 ## Nice to Have
 
 - **Rules Engine** - Rule-based automation
-- **Zapier Integration** - Add zaps for Zapier automation (not Dripl-specific)
+- **Zapier Integration** - Add zaps for Zapier automation (not Balanced-specific)
 
 ### Checkpoint 22: Override Response DTOs and Test Assertion Improvements
 

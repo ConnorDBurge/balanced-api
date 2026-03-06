@@ -1,48 +1,48 @@
 services:
-  dripl-api:
+  balanced-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dripl-api
+    container_name: balanced-api
     ports:
       - "8080:8080"
     env_file:
       - .env
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - DB_HOST=dripl-db
+      - DB_HOST=balanced-db
       - DB_PORT=5432
-      - DB_NAME=dripl
-      - DB_USERNAME=dripl
-      - DB_PASSWORD=dripl
+      - DB_NAME=balanced
+      - DB_USERNAME=balanced
+      - DB_PASSWORD=balanced
     depends_on:
-      dripl-db:
+      balanced-db:
         condition: service_healthy
     networks:
-      - dripl-network
+      - balanced-network
 
-  dripl-db:
+  balanced-db:
     image: postgres:17-alpine
-    container_name: dripl-db
+    container_name: balanced-db
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=dripl
-      - POSTGRES_USER=dripl
-      - POSTGRES_PASSWORD=dripl
+      - POSTGRES_DB=balanced
+      - POSTGRES_USER=balanced
+      - POSTGRES_PASSWORD=balanced
     volumes:
-      - dripl-db-data:/var/lib/postgresql/data
+      - balanced-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dripl"]
+      test: ["CMD-SHELL", "pg_isready -U balanced"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - dripl-network
+      - balanced-network
 
 networks:
-  dripl-network:
+  balanced-network:
     driver: bridge
 
 volumes:
-  dripl-db-data:
+  balanced-db-data:

@@ -27,24 +27,37 @@ request:
   scripts:
     - type: before-request
       code: |-
-        const token = bru.getVar("token");
+        const tempToken = bru.getVar("tempToken");
         const apiKey = bru.getEnvVar("x-api-key");
         const baseUrl = bru.getEnvVar("balanced-base-url");
-        const user = bru.getEnvVar("user");
 
-        try {
-            const resp = await require("axios").post(
-              `${baseUrl}/api/v1/auth/bootstrap`,
-              { email: user },
-              { headers: { "X-API-KEY": apiKey } }
-            );
-            bru.setVar("token", resp.data.token);
+        // If a temp token exists and is not expired, use it
+        if (tempToken) {
+          try {
+            const payload = JSON.parse(atob(tempToken.split(".")[1]));
+            if (Date.now() < (payload.exp * 1000) - 30000) {
+              bru.setVar("token", tempToken);
+              return;
+            }
           } catch (e) {}
+          bru.setVar("tempToken", null);
+        }
+
+        // Default: auto-bootstrap with configured user
+        const defaultUser = bru.getEnvVar("defaultUser");
+        try {
+          const resp = await require("axios").post(
+            `${baseUrl}/api/v1/auth/bootstrap`,
+            { email: defaultUser },
+            { headers: { "X-API-KEY": apiKey } }
+          );
+          bru.setVar("token", resp.data.token);
+        } catch (e) {}
     - type: after-response
       code: |-
         if (res.getStatus() >= 200 && res.getStatus() < 300 && res.getBody().token) {
-               bru.setVar("token", res.getBody().token);
-           }
+          bru.setVar("tempToken", res.getBody().token);
+        }
 bundled: false
 extensions:
   bruno:

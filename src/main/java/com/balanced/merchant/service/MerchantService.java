@@ -1,0 +1,90 @@
+package com.balanced.merchant.service;
+
+import com.balanced.common.exception.ConflictException;
+import com.balanced.common.exception.ResourceNotFoundException;
+import com.balanced.merchant.dto.CreateMerchantInput;
+import com.balanced.merchant.dto.UpdateMerchantInput;
+import com.balanced.merchant.entity.Merchant;
+import com.balanced.common.enums.Status;
+import com.balanced.merchant.mapper.MerchantMapper;
+import com.balanced.merchant.repository.MerchantRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MerchantService {
+
+    private final MerchantRepository merchantRepository;
+    private final MerchantMapper merchantMapper;
+
+    @Transactional(readOnly = true)
+    public List<Merchant> listAllByWorkspaceId(UUID workspaceId) {
+        return merchantRepository.findAllByWorkspaceId(workspaceId);
+    }
+
+    @Transactional(readOnly = true)
+    public Merchant getMerchant(UUID merchantId, UUID workspaceId) {
+        return merchantRepository.findByIdAndWorkspaceId(merchantId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Merchant not found"));
+    }
+
+    @Transactional
+    public Merchant createMerchant(UUID workspaceId, CreateMerchantInput dto) {
+        if (merchantRepository.existsByWorkspaceIdAndNameIgnoreCase(workspaceId, dto.getName())) {
+            throw new ConflictException("A merchant named '" + dto.getName() + "' already exists");
+        }
+
+        Merchant merchant = Merchant.builder()
+                .workspaceId(workspaceId)
+                .name(dto.getName())
+                .status(Status.ACTIVE)
+                .build();
+
+        log.info("Created merchant '{}'", dto.getName());
+        return merchantRepository.save(merchant);
+    }
+
+    @Transactional
+    public Merchant updateMerchant(UUID merchantId, UUID workspaceId, UpdateMerchantInput dto) {
+        Merchant merchant = getMerchant(merchantId, workspaceId);
+
+        if (dto.getName() != null
+                && !dto.getName().equalsIgnoreCase(merchant.getName())
+                && merchantRepository.existsByWorkspaceIdAndNameIgnoreCase(workspaceId, dto.getName())) {
+            throw new ConflictException("A merchant named '" + dto.getName() + "' already exists");
+        }
+
+        merchantMapper.updateEntity(dto, merchant);
+        log.info("Updating merchant '{}' ({})", merchant.getName(), merchantId);
+        return merchantRepository.save(merchant);
+    }
+
+    @Transactional
+    public void deleteMerchant(UUID merchantId, UUID workspaceId) {
+        Merchant merchant = getMerchant(merchantId, workspaceId);
+        log.info("Deleting merchant '{}' ({})", merchant.getName(), merchantId);
+        merchantRepository.delete(merchant);
+    }
+
+    @Transactional
+    public Merchant resolveMerchant(String merchantName, UUID workspaceId) {
+        return merchantRepository.findByWorkspaceIdAndNameIgnoreCase(workspaceId, merchantName)
+                .orElseGet(() -> {
+                    Merchant merchant = Merchant.builder()
+                            .workspaceId(workspaceId)
+                            .name(merchantName)
+                            .status(Status.ACTIVE)
+                            .build();
+                    Merchant saved = merchantRepository.save(merchant);
+                    log.info("Auto-created merchant '{}'", merchantName);
+                    return saved;
+                });
+    }
+}

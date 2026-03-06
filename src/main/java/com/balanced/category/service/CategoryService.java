@@ -1,0 +1,218 @@
+package com.balanced.category.service;
+
+import com.balanced.budget.repository.BudgetPeriodEntryRepository;
+import com.balanced.category.dto.CreateCategoryInput;
+import com.balanced.category.dto.UpdateCategoryInput;
+import com.balanced.category.entity.Category;
+import com.balanced.category.mapper.CategoryMapper;
+import com.balanced.category.repository.CategoryRepository;
+import com.balanced.common.enums.Status;
+import com.balanced.common.exception.BadRequestException;
+import com.balanced.common.exception.ResourceNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class CategoryService {
+
+    private final CategoryRepository categoryRepository;
+    private final CategoryMapper categoryMapper;
+    private final BudgetPeriodEntryRepository budgetPeriodEntryRepository;
+
+    @Transactional(readOnly = true)
+    public List<Category> listAll(Specification<Category> spec) {
+        return categoryRepository.findAll(spec);
+    }
+
+    @Transactional(readOnly = true)
+    public Category getCategory(UUID categoryId, UUID workspaceId) {
+        return categoryRepository.findByIdAndWorkspaceId(categoryId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Category> getChildren(UUID parentId) {
+        return categoryRepository.findAllByParentId(parentId);
+    }
+
+    @Transactional
+    public Category createCategory(UUID workspaceId, CreateCategoryInput dto) {
+        boolean income = dto.getIncome() != null && dto.getIncome();
+
+        if (dto.getParentId() != null) {
+            Category parent = validateParent(workspaceId, dto.getParentId());
+            income = parent.isIncome();
+            budgetPeriodEntryRepository.deleteByCategoryId(dto.getParentId());
+        }
+
+        int nextOrder = dto.getParentId() != null
+                ? getSiblings(dto.getParentId()).size()
+                : getRoots(workspaceId).size();
+
+        Category category = Category.builder()
+                .workspaceId(workspaceId)
+                .parentId(dto.getParentId())
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .status(Status.ACTIVE)
+                .income(income)
+                .excludeFromBudget(dto.getExcludeFromBudget() != null && dto.getExcludeFromBudget())
+                .excludeFromTotals(dto.getExcludeFromTotals() != null && dto.getExcludeFromTotals())
+                .displayOrder(nextOrder)
+                .build();
+
+        log.info("Created category '{}'", dto.getName());
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public Category updateCategory(UUID categoryId, UUID workspaceId, UpdateCategoryInput dto) {
+        Category category = getCategory(categoryId, workspaceId);
+
+        categoryMapper.updateEntity(dto, category);
+
+        if (dto.isChildrenSpecified()) {
+            List<Category> children = categoryRepository.findAllByParentId(categoryId);
+            List<Category> currentRoots = getRoots(workspaceId);
+            int nextRootOrder = currentRoots.size();
+            for (Category child : children) {
+                child.setParentId(null);
+                child.setDisplayOrder(nextRootOrder++);
+            }
+            categoryRepository.saveAll(children);
+        }
+
+        if (dto.isParentIdSpecified()) {
+            UUID parentId = dto.getParentId();
+            if (parentId != null) {
+                if (parentId.equals(categoryId)) {
+                    throw new BadRequestException("Category cannot be its own parent");
+                }
+                Category parent = validateParent(workspaceId, parentId);
+                ensureNoCircularReference(categoryId, parentId);
+                if (!dto.isChildrenSpecified()) {
+                    ensureNoCategoryChildren(categoryId);
+                }
+                category.setIncome(parent.isIncome());
+                budgetPeriodEntryRepository.deleteByCategoryId(parentId);
+                category.setDisplayOrder(getSiblings(parentId).size());
+            } else {
+                category.setDisplayOrder(getRoots(workspaceId).size());
+            }
+            category.setParentId(parentId);
+        }
+
+        log.info("Updating category '{}' ({})", category.getName(), categoryId);
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public void moveCategory(UUID categoryId, UUID workspaceId, int newPosition) {
+        Category category = getCategory(categoryId, workspaceId);
+
+        List<Category> siblings = category.getParentId() != null
+                ? getSiblings(category.getParentId())
+                : getRoots(workspaceId);
+
+        // Remove the moved category from the list
+        siblings.removeIf(c -> c.getId().equals(categoryId));
+
+        // Clamp position
+        int position = Math.max(0, Math.min(newPosition, siblings.size()));
+
+        // Insert at new position
+        siblings.add(position, category);
+
+        // Re-number all siblings sequentially
+        for (int i = 0; i < siblings.size(); i++) {
+            siblings.get(i).setDisplayOrder(i);
+        }
+        categoryRepository.saveAll(siblings);
+        log.info("Moved category '{}' to position {}", category.getName(), position);
+    }
+
+    private List<Category> getRoots(UUID workspaceId) {
+        return new java.util.ArrayList<>(categoryRepository.findRootsByWorkspaceIdOrderByDisplayOrder(workspaceId));
+    }
+
+    private List<Category> getSiblings(UUID parentId) {
+        return new java.util.ArrayList<>(categoryRepository.findByParentIdOrderByDisplayOrder(parentId));
+    }
+
+    @Transactional
+    public void deleteCategory(UUID categoryId, UUID workspaceId) {
+        Category category = getCategory(categoryId, workspaceId);
+        log.info("Deleting category '{}' ({})", category.getName(), categoryId);
+        categoryRepository.delete(category);
+    }
+
+    private Category validateParent(UUID workspaceId, UUID parentId) {
+        Category parent = categoryRepository.findByIdAndWorkspaceId(parentId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Parent category not found"));
+
+        if (parent.getParentId() != null) {
+            throw new BadRequestException("Parent category cannot have its own parent (maximum depth is 2)");
+        }
+
+        return parent;
+    }
+
+    private void ensureNoCircularReference(UUID categoryId, UUID parentId) {
+        Set<UUID> visited = new HashSet<>();
+        UUID current = parentId;
+
+        while (current != null) {
+            if (!visited.add(current) || categoryId.equals(current)) {
+                throw new BadRequestException("Circular category relationship detected");
+            }
+            current = categoryRepository.findById(current)
+                    .map(Category::getParentId)
+                    .orElse(null);
+        }
+    }
+
+    private void ensureNoCategoryChildren(UUID categoryId) {
+        if (categoryRepository.existsByParentId(categoryId)) {
+            throw new BadRequestException("Cannot nest a category that already has children (maximum depth is 2)");
+        }
+    }
+
+    /**
+     * Validates that a category is not a group (has no children).
+     * Transactions can only be assigned to leaf categories.
+     */
+    @Transactional(readOnly = true)
+    public void validateNotGroup(UUID categoryId) {
+        if (categoryId != null && categoryRepository.existsByParentId(categoryId)) {
+            throw new BadRequestException("Cannot assign a transaction to a parent category group");
+        }
+    }
+
+    /**
+     * Validates that a category's income flag matches the amount sign.
+     * Positive amounts require income categories; negative/zero amounts require expense categories.
+     */
+    @Transactional
+    public void validateCategoryPolarity(UUID categoryId, BigDecimal amount, UUID workspaceId) {
+        if (categoryId == null || amount == null) return;
+        Category category = getCategory(categoryId, workspaceId);
+        boolean isPositive = amount.compareTo(BigDecimal.ZERO) > 0;
+        if (isPositive && !category.isIncome()) {
+            throw new BadRequestException("Positive amounts must use an income category, but '" + category.getName() + "' is an expense category.");
+        }
+        if (!isPositive && category.isIncome()) {
+            throw new BadRequestException("Negative amounts must use an expense category, but '" + category.getName() + "' is an income category.");
+        }
+    }
+}

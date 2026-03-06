@@ -1,0 +1,25 @@
+package com.balanced.transaction.event.dto;
+
+import com.balanced.common.event.FieldChange;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TransactionEventResponse {
+
+    private UUID id;
+    private UUID transactionId;
+    private String eventType;
+    private List<FieldChange> changes;
+    private String performedBy;
+    private LocalDateTime performedAt;
+}

@@ -1,32 +1,32 @@
-# Dripl — Architecture
+# Balanced — Architecture
 
 ## Overview
 
-Dripl is a personal/family finance management application. It is built as a modular Spring Boot monolith with a Next.js frontend, backed by PostgreSQL.
+Balanced is a personal/family finance management application. It is built as a modular Spring Boot monolith with a Next.js frontend, backed by PostgreSQL.
 
 ## Stack
 
 | Layer       | Technology              | Container     |
 |-------------|-------------------------|---------------|
-| Frontend    | Next.js (TypeScript)    | `dripl-ui`    |
-| Backend     | Java 21 + Spring Boot   | `dripl-api`   |
-| Database    | PostgreSQL              | `dripl-db`    |
+| Frontend    | Next.js (TypeScript)    | `balanced-ui`    |
+| Backend     | Java 21 + Spring Boot   | `balanced-api`   |
+| Database    | PostgreSQL              | `balanced-db`    |
 
 ## Infrastructure
 
-All three containers run on a single Docker network (`dripl-network`).
+All three containers run on a single Docker network (`balanced-network`).
 
 ```
-dripl-network
-├── dripl-ui   (:3000)   → Next.js frontend
-├── dripl-api  (:8080)   → Spring Boot API
-└── dripl-db   (:5432)   → PostgreSQL
+balanced-network
+├── balanced-ui   (:3000)   → Next.js frontend
+├── balanced-api  (:8080)   → Spring Boot API
+└── balanced-db   (:5432)   → PostgreSQL
 ```
 
 ## Package Structure
 
 ```
-com.dripl
+com.balanced
 ├── auth/
 │   ├── config/             # SecurityConfig (filter chain, CORS, session policy)
 │   ├── controller/         # DevTokenController (profile-gated), ProtectedController
@@ -170,7 +170,7 @@ A profile-gated endpoint (`/dev/token`) allows minting JWTs for Postman testing 
 
 ### OAuth (Future)
 
-OAuth2 login (Google, Apple, etc.) will be handled by NextAuth.js in the frontend. The frontend will exchange the OAuth token for a Dripl JWT from the backend.
+OAuth2 login (Google, Apple, etc.) will be handled by NextAuth.js in the frontend. The frontend will exchange the OAuth token for a Balanced JWT from the backend.
 
 ### Authorization
 
@@ -506,7 +506,7 @@ When a transaction is linked to a recurring item, in a group, or in a split, cer
 - **Controllers**: UserController (12), WorkspaceController (9), CurrentWorkspaceController (11), AccountController (6), MerchantController (6), TagController (6), CategoryController (8), TransactionController (8), RecurringItemController (17), TransactionGroupController (5), TransactionSplitController (5)
 - **Utilities**: JwtUtil (7), GlobalExceptionHandler (14), WorkspaceCleanupListener (3), RecurringOccurrenceCalculator (11), DomainEventPublisher (14)
 - **Domain**: AccountTypeSubTypeTest (58), CategoryTreeDtoTest (5), BudgetPeriodCalculatorTest (26), BudgetCrudServiceTest (19), BudgetServiceTest (9), BudgetViewServiceTest (21), BudgetCrudControllerTest (6), BudgetControllerTest (5), WorkspaceSettingsServiceTest (5), WorkspaceSettingsControllerTest (2)
-- **Context**: DriplApplicationTests (1)
+- **Context**: BalancedApplicationTests (1)
 
 ### Integration Tests (274)
 All IT tests use Testcontainers (PostgreSQL 17 Alpine) with a singleton container pattern.
@@ -554,9 +554,9 @@ All IT tests use Testcontainers (PostgreSQL 17 Alpine) with a singleton containe
 
 8. **Correlation ID via MDC** — Request tracing uses SLF4J MDC rather than passing correlation IDs through method parameters. This keeps service methods clean while enabling end-to-end tracing across sync and async boundaries.
 
-9. **Dev-only seed data** — A `@Profile("dev")` `CommandLineRunner` wipes and recreates all data on every startup from JSON files (`users.json`, `workspaces.json`). Uses the service layer (not repositories) to seed users, workspaces, memberships, accounts, merchants, tags, and categories (with parent-child nesting). A fake `SecurityContext` (`seed-data@dripl.dev`) is set during seeding so JPA auditing populates `createdBy`/`updatedBy`. Database wipe leverages `ON DELETE CASCADE` — only `workspaces` and `users` need explicit deletion. All `com.dripl` logging is muted to WARN during seeding to keep startup output clean; a summary table is printed after seeding completes.
+9. **Dev-only seed data** — A `@Profile("dev")` `CommandLineRunner` wipes and recreates all data on every startup from JSON files (`users.json`, `workspaces.json`). Uses the service layer (not repositories) to seed users, workspaces, memberships, accounts, merchants, tags, and categories (with parent-child nesting). A fake `SecurityContext` (`seed-data@balanced.dev`) is set during seeding so JPA auditing populates `createdBy`/`updatedBy`. Database wipe leverages `ON DELETE CASCADE` — only `workspaces` and `users` need explicit deletion. All `com.balanced` logging is muted to WARN during seeding to keep startup output clean; a summary table is printed after seeding completes.
 
-10. **Shared Status enum** — A single `com.dripl.common.enums.Status` enum (`ACTIVE`, `ARCHIVED`, `CLOSED`) is shared across Account, Merchant, Tag, and Category domains. Domain-specific status enums (`WorkspaceStatus`, `MembershipStatus`) remain separate where they have unique values.
+10. **Shared Status enum** — A single `com.balanced.common.enums.Status` enum (`ACTIVE`, `ARCHIVED`, `CLOSED`) is shared across Account, Merchant, Tag, and Category domains. Domain-specific status enums (`WorkspaceStatus`, `MembershipStatus`) remain separate where they have unique values.
 
 11. **Category hierarchy (max depth 2)** — Categories support one level of nesting via a self-referencing `parent_id` FK (`ON DELETE SET NULL`). The service validates that a parent exists in the same workspace, is itself a root category (no grandchildren), and prevents circular references by walking the parent chain. Deleting a parent promotes its children to root. The `/categories/tree` endpoint builds the hierarchy in memory using `CategoryTreeDto.buildTree()` — groups categories by `parentId`, then recursively assembles branches sorted by name.
 
